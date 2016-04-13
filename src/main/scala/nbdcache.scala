@@ -395,7 +395,7 @@ class MSHRFile(implicit p: Parameters) extends L1HellaCacheModule()(p) {
   }
 
   // determine if the request is in the memory region or mmio region
-  val cacheable = io.req.bits.addr < UInt(mmioBase)
+  val cacheable = Bool(false)
 
   val sdq_val = Reg(init=Bits(0, sdqDepth))
   val sdq_alloc_id = PriorityEncoder(~sdq_val(sdqDepth-1,0))
