@@ -163,10 +163,6 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
   val wb_reg_wdata = Reg(Bits())
   val wb_reg_rs2 = Reg(Bits())
   val take_pc_wb = Wire(Bool())
-  //SH
-  val reg_ll_wdata_postponed = Reg(Bits())
-  val reg_ll_waddr_postponed = Reg(Bits())
-  val reg_ll_wen_postponed = Reg(init = Bool(false))
 
   val take_pc_mem_wb = take_pc_wb || take_pc_mem
   val take_pc = take_pc_mem_wb
@@ -255,7 +251,7 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
   alu.io.fn := ex_ctrl.alu_fn
   alu.io.in2 := ex_op2.toUInt
   alu.io.in1 := ex_op1.toUInt
-
+  
   // multiplier and divider
   val div = Module(new MulDiv(width = xLen,
                               unroll = if(usingFastMulDiv) 8 else 1,
@@ -414,30 +410,12 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
 
   val wb_valid = wb_reg_valid && !replay_wb && !csr.io.csr_xcpt
   val wb_wen = wb_valid && wb_ctrl.wxd
-
-  //SH
-  val stall_wen = ll_wen && wb_wen// && (wb_waddr === UInt(0x1))
-  when (stall_wen) {
-       reg_ll_wen_postponed := Bool(true)
-       reg_ll_waddr_postponed := wb_waddr
-       reg_ll_wdata_postponed := wb_reg_wdata
-  }
-  when (!wb_wen || (!ll_wen && wb_wen && wb_waddr === reg_ll_waddr_postponed)) {
-       reg_ll_wen_postponed := Bool(false)
-       reg_ll_waddr_postponed := UInt(0)
-       reg_ll_wdata_postponed := UInt(0)
-  }
-  val rf_wen = wb_wen || ll_wen || reg_ll_wen_postponed
-  val rf_waddr = Mux(ll_wen, ll_waddr,
-                 Mux(wb_wen, wb_waddr,
-                 reg_ll_waddr_postponed))
-
+  val rf_wen = wb_wen || ll_wen 
+  val rf_waddr = Mux(ll_wen, ll_waddr, wb_waddr)
   val rf_wdata = Mux(dmem_resp_valid && dmem_resp_xpu, io.dmem.resp.bits.data,
                  Mux(ll_wen, ll_wdata,
                  Mux(wb_ctrl.csr =/= CSR.N, csr.io.rw.rdata,
-                 Mux(wb_wen, wb_reg_wdata,
-                 reg_ll_wdata_postponed))))
-
+                 wb_reg_wdata)))
   when (rf_wen) { rf.write(rf_waddr, rf_wdata) }
 
   // hook up control/status regfile
@@ -506,8 +484,7 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
     id_ctrl.mem && !io.dmem.req.ready ||
     Bool(usingRoCC) && wb_reg_rocc_pending && id_ctrl.rocc && !io.rocc.cmd.ready ||
     id_do_fence ||
-    csr.io.csr_stall ||
-    stall_wen || reg_ll_wen_postponed   //SH
+    csr.io.csr_stall
   ctrl_killd := !io.imem.resp.valid || take_pc || ctrl_stalld || csr.io.interrupt
 
   io.imem.req.valid := take_pc
