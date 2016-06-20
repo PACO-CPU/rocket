@@ -118,7 +118,7 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
     val rocc = new RoCCInterface().flip
   }
 
-  class Memo extends Module {
+  class Memo(wen: Boolean=false, ren: Boolean=false) extends Module {
   val io = new Bundle {
     val wen     = Bool(INPUT)
     val wrAddr  = UInt(INPUT,  8)
@@ -126,8 +126,8 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
     val ren     = Bool(INPUT)
     val rdAddr  = UInt(INPUT,  8)
     val rdData  = UInt(OUTPUT, 8)
-  }
-  val mem = Mem(UInt(width = 8), 256)
+}
+  val mem = Mem(256,UInt(width = 8))
   when (io.wen) {
   mem(io.wrAddr) := io.wrData
   }
@@ -274,8 +274,10 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
   alu.io.in1 := ex_op1.toUInt
 
  //instance for LUT mem module
-  val memo = Module(new Memo)
-  //memo.io.rdData
+  val memo = Module(new Memo(ren =true))
+  memo.io.rdAddr := UInt(0, width = 8)
+
+
 
   // multiplier and divider
   val div = Module(new MulDiv(width = xLen,
