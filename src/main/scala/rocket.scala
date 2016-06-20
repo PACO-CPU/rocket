@@ -118,6 +118,27 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
     val rocc = new RoCCInterface().flip
   }
 
+  class Memo extends Module {
+  val io = new Bundle {
+    val wen     = Bool(INPUT)
+    val wrAddr  = UInt(INPUT,  8)
+    val wrData  = UInt(INPUT,  8)
+    val ren     = Bool(INPUT)
+    val rdAddr  = UInt(INPUT,  8)
+    val rdData  = UInt(OUTPUT, 8)
+  }
+  val mem = Mem(UInt(width = 8), 256)
+  when (io.wen) {
+  mem(io.wrAddr) := io.wrData
+  }
+  io.rdData := UInt(0)
+  when (io.ren) {
+  io.rdData := mem(io.rdAddr)
+  }
+}
+
+
+
   var decode_table = XDecode.table
   if (usingFPU) decode_table ++= FDecode.table
   if (usingFPU && usingFDivSqrt) decode_table ++= FDivSqrtDecode.table
@@ -251,7 +272,11 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
   alu.io.fn := ex_ctrl.alu_fn
   alu.io.in2 := ex_op2.toUInt
   alu.io.in1 := ex_op1.toUInt
-  
+
+ //instance for LUT mem module
+  val memo = Module(new Memo)
+  //memo.io.rdData
+
   // multiplier and divider
   val div = Module(new MulDiv(width = xLen,
                               unroll = if(usingFastMulDiv) 8 else 1,
@@ -331,10 +356,15 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
     when (ex_reg_btb_hit) { mem_reg_btb_resp := ex_reg_btb_resp }
     mem_reg_flush_pipe := ex_reg_flush_pipe
     mem_reg_slow_bypass := ex_slow_bypass
-
     mem_reg_inst := ex_reg_inst
     mem_reg_pc := ex_reg_pc
-    mem_reg_wdata := alu.io.out
+
+    //enable bit  for selecting LUT or ALU wb to memory
+    val mem_reg_sel = Reg(init=Bool(true))
+    mem_reg_wdata := Mux(mem_reg_sel, alu.io.out, memo.io.rdData )
+
+    //original line commented for now for LUT
+    //mem_reg_wdata := alu.io.out
     when (ex_ctrl.rxs2 && (ex_ctrl.mem || ex_ctrl.rocc)) {
       mem_reg_rs2 := ex_rs(1)
     }
@@ -410,7 +440,7 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
 
   val wb_valid = wb_reg_valid && !replay_wb && !csr.io.csr_xcpt
   val wb_wen = wb_valid && wb_ctrl.wxd
-  val rf_wen = wb_wen || ll_wen 
+  val rf_wen = wb_wen || ll_wen
   val rf_waddr = Mux(ll_wen, ll_waddr, wb_waddr)
   val rf_wdata = Mux(dmem_resp_valid && dmem_resp_xpu, io.dmem.resp.bits.data,
                  Mux(ll_wen, ll_wdata,
@@ -615,4 +645,24 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
       when (ens) { r := _next }
     }
   }
+
+ //class RomIo extends Bundle {
+   //val isVal = Bool(INPUT)
+   //val a = UInt(INPUT, width=32)
+   //val b = UInt (INPUT, width=32)
+   //val c = UInt(INPUT, width=32)
+   //val raddr = UInt(INPUT,  width=32)
+   //val rdata = UInt(OUTPUT, width=32)
+   //raddr.setName("RADDR")
+   //rdata.setName("RDATA")
+//}
+
+ //class Rom extends BlackBox {
+   //val io = new RomIo()
+   //io.a := UInt(1, 32)
+   //io.b := UInt(2, 32)
+   //io.c := UInt(3, 32)
+   //val rom = Vec(Array(io.a,io.b,io.c))
+   //io.rdata := rom(io.raddr)
+  //}
 }
