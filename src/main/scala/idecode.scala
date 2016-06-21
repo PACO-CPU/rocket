@@ -18,9 +18,9 @@ abstract trait DecodeConstants
                 //         | rocc| | | renx1     s_alu1                          mem_val           | | | wfd         |
                 //   val   | | br| | | | s_alu2  |       imm    dw     alu       | mem_cmd mem_type| | | | div       |
                 //   |     | | | | | | | |       |       |      |      |         | |         |     | | | | | wxd     | fence
-                //   |     | | | | | | | |       |       |      |      |         | |         |     | | | | | | csr   | | amo
-                //   |     | | | | | | | |       |       |      |      |         | |         |     | | | | | | |     | | |
-                List(N,    X,X,X,X,X,X,X,A2_X,   A1_X,   IMM_X, DW_X,  FN_X,     N,M_X,      MT_X, X,X,X,X,X,X,CSR.X,X,X,X)
+                //   |     | | | | | | | |       |       |      |      |         | |         |     | | | | | | csr   | | amo alu_lut_sel
+                //   |     | | | | | | | |       |       |      |      |         | |         |     | | | | | | |     | | |   |
+                List(N,    X,X,X,X,X,X,X,A2_X,   A1_X,   IMM_X, DW_X,  FN_X,     N,M_X,      MT_X, X,X,X,X,X,X,CSR.X,X,X,X,  X)
 
   val table: Array[(BitPat, List[BitPat])]
 }
@@ -58,7 +58,7 @@ class IntCtrlSigs extends Bundle {
     val decoder = DecodeLogic(inst, XDecode.decode_default, table)
     val sigs = Seq(legal, fp, rocc, branch, jal, jalr, rxs2, rxs1, sel_alu2,
                    sel_alu1, sel_imm, alu_dw, alu_fn, mem, mem_cmd, mem_type,
-                   rfs1, rfs2, rfs3, wfd, div, wxd, csr, fence_i, fence, amo)
+                   rfs1, rfs2, rfs3, wfd, div, wxd, csr, fence_i, fence, amo, alu_lut_sel)
     sigs zip decoder map {case(s,d) => s := d}
     this
   }
