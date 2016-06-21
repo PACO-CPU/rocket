@@ -107,19 +107,8 @@ object ImmGen {
     Cat(sign, b30_20, b19_12, b11, b10_5, b4_1, b0).toSInt
   }
 }
-
-class Rocket(implicit p: Parameters) extends CoreModule()(p) {
-  val io = new Bundle {
-    val host = new HtifIO
-    val imem  = new FrontendIO()(p.alterPartial({case CacheName => "L1I" }))
-    val dmem = new HellaCacheIO()(p.alterPartial({ case CacheName => "L1D" }))
-    val ptw = new DatapathPTWIO().flip
-    val fpu = new FPUIO().flip
-    val rocc = new RoCCInterface().flip
-  }
-
-  class Memo(wen: Boolean=false, ren: Boolean=false) extends Module {
-  val io = new Bundle {
+class Memo(wen: Boolean=false, ren: Boolean=false) extends Module {
+    val io = new Bundle {
     val wen     = Bool(INPUT)
     val wrAddr  = UInt(INPUT,  8)
     val wrData  = UInt(INPUT,  8)
@@ -136,6 +125,18 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
   io.rdData := mem(io.rdAddr)
   }
 }
+
+class Rocket(implicit p: Parameters) extends CoreModule()(p) {
+  val io = new Bundle {
+    val host = new HtifIO
+    val imem  = new FrontendIO()(p.alterPartial({case CacheName => "L1I" }))
+    val dmem = new HellaCacheIO()(p.alterPartial({ case CacheName => "L1D" }))
+    val ptw = new DatapathPTWIO().flip
+    val fpu = new FPUIO().flip
+    val rocc = new RoCCInterface().flip
+  }
+
+  
 
 
 
