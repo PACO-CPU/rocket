@@ -126,6 +126,20 @@ class Memo(wen: Boolean=false, ren: Boolean=false) extends Module {
   }
 }
 
+//class foo extends Bundle {
+//val r = Bool()
+//val g = Bool()
+//val b = Bool()
+
+//}
+
+//class example extends BlackBox {
+	//val io = new Bundle{
+	  //val h = UInt(INPUT,8)
+	  //val out = new foo().asOutput
+	//}
+//}
+
 class Rocket(implicit p: Parameters) extends CoreModule()(p) {
   val io = new Bundle {
     val host = new HtifIO
@@ -136,7 +150,7 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
     val rocc = new RoCCInterface().flip
   }
 
-  
+
 
 
 
@@ -240,6 +254,8 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
     if (fastLoadByte) io.dmem.resp.bits.data
     else if (fastLoadWord) io.dmem.resp.bits.data_word_bypass
     else wb_reg_wdata
+
+ val lut_sel = id_ctrl.alu_lut_sel
 
   // detect bypass opportunities
   val ex_waddr = ex_reg_inst(11,7)
@@ -363,9 +379,9 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
     mem_reg_pc := ex_reg_pc
 
     //enable bit  for selecting LUT or ALU wb to memory
-    val mem_reg_sel = Reg(init=Bool(true))
-    mem_reg_wdata := Mux(mem_reg_sel, alu.io.out, memo.io.rdData )
-
+    //val test = mem_ctrl.alu_lut_sel
+    //val mem_reg_sel = Reg(init=test)
+    mem_reg_wdata := Mux(lut_sel, memo.io.rdData, alu.io.out )
     //original line commented for now for LUT
     //mem_reg_wdata := alu.io.out
     when (ex_ctrl.rxs2 && (ex_ctrl.mem || ex_ctrl.rocc)) {
@@ -668,4 +684,8 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
    //val rom = Vec(Array(io.a,io.b,io.c))
    //io.rdata := rom(io.raddr)
   //}
+  //val exio = Module(new example)
+   //val h = UInt(1,8)
+   //exio.io.h := h  //connection
+   //val j = exio.io.out
 }
