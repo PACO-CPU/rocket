@@ -108,6 +108,42 @@ object ImmGen {
   }
 }
 
+//To test without black box extend Module and uncomment below lines
+class LutHwCore extends BlackBox {
+    val io = new Bundle {
+    val data_i     = Bits(INPUT, 32)
+   val id_rst_i  = Bool(INPUT)
+   val id_stat_i  = Bool(INPUT)
+   val id_exe_i   = Bool(INPUT)
+   val id_cfg_i  = Bool(INPUT)
+   val data_o  = Bits(OUTPUT, 32)
+   val data2_o  = Bits(OUTPUT, 32)
+   val data3_o  = Bits(OUTPUT, 32)
+   val data_valid_o = Bool(OUTPUT)
+   val error_o = Bool(OUTPUT)
+   val status_o = Bits(OUTPUT, 32)
+}
+  //val mem = Mem(256,Bits(width = 8))
+  //when (io.wen) {
+  //mem(io.wrAddr) := io.wrData
+  //}
+  //io.rdData := Bits(0,8)
+  //when (io.ren) {
+  //io.rdData := mem(io.rdAddr)
+ // }
+}
+
+class BlockRam extends BlackBox{
+ val io = new Bundle {
+    val clk    = Bool(INPUT)
+    val port1_addr  = Bits(INPUT, 9)
+    val port1_data_w  = Bits(INPUT, 32)
+    val port1_data_r   = Bits(OUTPUT,32)
+    val port1_we  = Bool(INPUT)
+  } 
+}
+
+
 class Rocket(implicit p: Parameters) extends CoreModule()(p) {
   val io = new Bundle {
     val host = new HtifIO
@@ -300,6 +336,8 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
  //instance for LUT mem module
   //val memo = Module(new Memo(ren =true))
   //memo.io.rdAddr := UInt(0, width = 8)
+  val lutcore = Module(new LutHwCore)
+  val bram = Module(new BlockRam)
 
 
 
