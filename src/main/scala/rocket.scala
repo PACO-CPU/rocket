@@ -111,38 +111,19 @@ object ImmGen {
 //To test without black box extend Module and uncomment below lines
 class LutHwCore extends BlackBox {
     val io = new Bundle {
-    val data_i     = Bits(INPUT, 32)
+   val data_i     = Bits(INPUT, 32)
+   val data2_i    = Bits(INPUT, 32)
+   val data3_i    = Bits(INPUT, 32)
    val id_rst_i  = Bool(INPUT)
    val id_stat_i  = Bool(INPUT)
    val id_exe_i   = Bool(INPUT)
    val id_cfg_i  = Bool(INPUT)
    val data_o  = Bits(OUTPUT, 32)
-   val data2_o  = Bits(OUTPUT, 32)
-   val data3_o  = Bits(OUTPUT, 32)
    val data_valid_o = Bool(OUTPUT)
    val error_o = Bool(OUTPUT)
    val status_o = Bits(OUTPUT, 32)
+  }  
 }
-  //val mem = Mem(256,Bits(width = 8))
-  //when (io.wen) {
-  //mem(io.wrAddr) := io.wrData
-  //}
-  //io.rdData := Bits(0,8)
-  //when (io.ren) {
-  //io.rdData := mem(io.rdAddr)
- // }
-}
-
-class BlockRam extends BlackBox{
- val io = new Bundle {
-    val clk    = Bool(INPUT)
-    val port1_addr  = Bits(INPUT, 9)
-    val port1_data_w  = Bits(INPUT, 32)
-    val port1_data_r   = Bits(OUTPUT,32)
-    val port1_we  = Bool(INPUT)
-  } 
-}
-
 
 class Rocket(implicit p: Parameters) extends CoreModule()(p) {
   val io = new Bundle {
@@ -203,11 +184,10 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
   val wb_reg_wdata = Reg(Bits())
   val wb_reg_rs2 = Reg(Bits())
   val take_pc_wb = Wire(Bool())
-  //val stall = Reg(init = Bool(false))
+  
 
   val take_pc_mem_wb = take_pc_wb || take_pc_mem
   val take_pc = take_pc_mem_wb
-
   // decode stage
   val id_pc = io.imem.resp.bits.pc
   val id_inst = io.imem.resp.bits.data(0).toBits; require(fetchWidth == 1)
@@ -223,7 +203,6 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
   val rf = new RegFile(31, xLen)
   val id_rs = id_raddr.map(rf.read _)
   val ctrl_killd = Wire(Bool())
-
   val csr = Module(new CSRFile)
   val id_csr_en = id_ctrl.csr =/= CSR.N
   val id_system_insn = id_ctrl.csr === CSR.I
@@ -260,40 +239,19 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
     else if (fastLoadWord) io.dmem.resp.bits.data_word_bypass
     else wb_reg_wdata
 
- //val lut_sel = id_ctrl.alu_lut_sel
+   val alu_lut_sel = id_ctrl.alu_lut_sel
+   val lutload = id_ctrl.lutl
+   val lutex1 = id_ctrl.lut_ex1
+   val lutex2 = id_ctrl.lut_ex2
 
   //Shift register to allow stalling and destalling
+ 
  val lut = Reg(init = Bool(true))
  val r0 = Reg(init = Bool(false), next = lut) 
  val r1 = Reg(init = Bool(false), next = r0) 
  val r2 = Reg(init = Bool(false), next = r1) 
  val r3 = Reg(init = Bool(false),next = r2) 
  val r4 = Reg(init = Bool(false),next = r3)
-// val r5 = Reg(init = Bool(false),next = r4)
- //val r6 = Reg(init = Bool(false),next = r5)
-// val r7 = Reg(init = Bool(false),next = r6)
-// val r8 = Reg(init = Bool(false),next = r7)
- //val r9 = Reg(init = Bool(false),next = r8)
-// val r10 = Reg(init = Bool(false),next = r9)
-// val r11 = Reg(init = Bool(false),next = r10)
-// val r12 = Reg(init = Bool(false),next = r11)
-// val r13 = Reg(init = Bool(false),next = r12)
-// val r14 = Reg(init = Bool(false),next = r13)
-// val r15 = Reg(init = Bool(false),next = r14)
-// val r16 = Reg(init = Bool(false),next = r15)
-// val r17 = Reg(init = Bool(false),next = r16)
-// val r18 = Reg(init = Bool(true), next = r17) 
-// val r19 = Reg(init = Bool(true), next = r18) 
-// val r20 = Reg(init = Bool(true),next = r19) 
-// val r21 = Reg(init = Bool(true),next = r20)
-// val r22 = Reg(init = Bool(true),next = r21)
-// val r23 = Reg(init = Bool(true),next = r22)
-// val r24 = Reg(init = Bool(true),next = r23)
-// val r25 = Reg(init = Bool(true),next = r24)
-// val r26 = Reg(init = Bool(true),next = r25)
-// val r27 = Reg(init = Bool(true),next = r26)
-// val r28 = Reg(init = Bool(true),next = r27)
-// val r29 = Reg(init = Bool(true),next = r28)
  val r30 = Reg(init = Bool(true),next = r4)
  val r31 = Reg(init = Bool(true),next = r30)
  val r32 = Reg(init = Bool(true),next = r31)
@@ -333,11 +291,29 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
   alu.io.in2 := ex_op2.toUInt
   alu.io.in1 := ex_op1.toUInt
 
- //instance for LUT mem module
-  //val memo = Module(new Memo(ren =true))
-  //memo.io.rdAddr := UInt(0, width = 8)
-  val lutcore = Module(new LutHwCore)
-  val bram = Module(new BlockRam)
+ //instance for LUT core sending values to the corresponding io ports of Lut blackbox
+val lutcore = Module(new LutHwCore)
+
+ val luthw = ex_ctrl.alu_lut_sel
+ val lut_exec = ex_ctrl.lut_ex1
+ val lut_exec2 = ex_ctrl.lut_ex2
+ val lut_load = ex_ctrl.lutl 
+ val lutdata_in = Mux(luthw, ex_rs(0), Bits(0,width=32))
+ val lutdata2_in = Bits(0,width=32)
+ val lutdata3_in =  Bits(0,width=32)
+ //val lutrst = Mux(luthw=== Bool(true) && id_inst(7)===Bool(true) && lut_exec ===Bool(false) , Bool(false), Bool(true))
+ //val lutcfg = Mux(luthw === Bool(true) && id_inst(7)===Bool(true) && lut_exec ===Bool(false) , Bool(true), Bool(false))
+ val lutrst = Mux(lut_load===Bool(true), Mux(id_inst(7) === Bool(true), Bool(false), Bool(true)), Bool(false))
+ val lutcfg = Mux(lut_load===Bool(true), Mux(id_inst(7) === Bool(true), Bool(true), Bool(false)), Bool(false))
+ val lutexe = Mux(lut_exec ===Bool(true)  && luthw === Bool(true) , Bool(true), Bool(false))
+ val lutstat = Bool(false)
+  lutcore.io.data_i := lutdata_in
+  lutcore.io.data2_i := lutdata2_in
+  lutcore.io.data3_i := lutdata3_in
+  lutcore.io.id_rst_i := lutrst
+  lutcore.io.id_cfg_i:= lutcfg
+  lutcore.io.id_exe_i := lutexe
+  lutcore.io.id_stat_i := lutstat
 
 
 
@@ -426,9 +402,9 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
     //enable bit  for selecting LUT or ALU wb to memory
     //val test = mem_ctrl.alu_lut_sel
     //val mem_reg_sel = Reg(init=test)
-    //mem_reg_wdata := Mux(lut_sel, memo.io.rdData, alu.io.out )
+    mem_reg_wdata := Mux(lutex1 || lutex2, lutcore.io.data_o, alu.io.out )
     //original line commented for now for LUT
-    mem_reg_wdata := alu.io.out
+    //mem_reg_wdata := alu.io.out
     when (ex_ctrl.rxs2 && (ex_ctrl.mem || ex_ctrl.rocc)) {
       mem_reg_rs2 := ex_rs(1)
     }
@@ -571,14 +547,14 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
 
     id_csr_en && !io.fpu.fcsr_rdy || checkHazards(fp_hazard_targets, fp_sboard.read _)
   } else Bool(false)
-
+  val lut_sel =  Mux(alu_lut_sel, lut, Bool(false))
   val ctrl_stalld =
     id_ex_hazard || id_mem_hazard || id_wb_hazard || id_sboard_hazard ||
     id_ctrl.fp && id_stall_fpu ||
     id_ctrl.mem && !io.dmem.req.ready ||
     Bool(usingRoCC) && wb_reg_rocc_pending && id_ctrl.rocc && !io.rocc.cmd.ready ||
     id_do_fence ||
-    csr.io.csr_stall || lut
+    csr.io.csr_stall || lut_sel
   ctrl_killd := !io.imem.resp.valid || take_pc || ctrl_stalld || csr.io.interrupt
 
   io.imem.req.valid := take_pc
