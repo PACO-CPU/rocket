@@ -109,19 +109,19 @@ object ImmGen {
 }
 
 //To test without black box extend Module and uncomment below lines
-class LutHwCore extends BlackBox {
+class LutHwCore(implicit val p:Parameters) extends BlackBox with HasCoreParameters {
     val io = new Bundle {
-   val data_i     = Bits(INPUT, 32)
-   val data2_i    = Bits(INPUT, 32)
-   val data3_i    = Bits(INPUT, 32)
+   val data_i     = Bits(INPUT, xLen)
+   val data2_i    = Bits(INPUT, xLen)
+   val data3_i    = Bits(INPUT, xLen)
    val id_rst_i  = Bool(INPUT)
    val id_stat_i  = Bool(INPUT)
    val id_exe_i   = Bool(INPUT)
    val id_cfg_i  = Bool(INPUT)
-   val data_o  = Bits(OUTPUT, 32)
+   val data_o  = Bits(OUTPUT, xLen)
    val data_valid_o = Bool(OUTPUT)
    val error_o = Bool(OUTPUT)
-   val status_o = Bits(OUTPUT, 32)
+   val status_o = Bits(OUTPUT, xLen)
   }  
 }
 
@@ -244,20 +244,7 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
    val lutex1 = id_ctrl.lut_ex1
    val lutex2 = id_ctrl.lut_ex2
 
-  //Shift register to allow stalling and destalling
  
- val lut = Reg(init = Bool(true))
- val r0 = Reg(init = Bool(false), next = lut) 
- val r1 = Reg(init = Bool(false), next = r0) 
- val r2 = Reg(init = Bool(false), next = r1) 
- val r3 = Reg(init = Bool(false),next = r2) 
- val r4 = Reg(init = Bool(false),next = r3)
- val r30 = Reg(init = Bool(true),next = r4)
- val r31 = Reg(init = Bool(true),next = r30)
- val r32 = Reg(init = Bool(true),next = r31)
- val r33 = Reg(init = Bool(true),next = r32)
- val r34 = Reg(init = Bool(true),next = r33)
- lut := r34 
   // detect bypass opportunities
   val ex_waddr = ex_reg_inst(11,7)
   val mem_waddr = mem_reg_inst(11,7)
@@ -292,21 +279,22 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
   alu.io.in1 := ex_op1.toUInt
 
  //instance for LUT core sending values to the corresponding io ports of Lut blackbox
-val lutcore = Module(new LutHwCore)
+  val lutcore = Module(new LutHwCore)
 
- val luthw = ex_ctrl.alu_lut_sel
- val lut_exec = ex_ctrl.lut_ex1
- val lut_exec2 = ex_ctrl.lut_ex2
- val lut_load = ex_ctrl.lutl 
- val lutdata_in = Mux(luthw, ex_rs(0), Bits(0,width=32))
- val lutdata2_in = Bits(0,width=32)
- val lutdata3_in =  Bits(0,width=32)
- //val lutrst = Mux(luthw=== Bool(true) && id_inst(7)===Bool(true) && lut_exec ===Bool(false) , Bool(false), Bool(true))
- //val lutcfg = Mux(luthw === Bool(true) && id_inst(7)===Bool(true) && lut_exec ===Bool(false) , Bool(true), Bool(false))
- val lutrst = Mux(lut_load===Bool(true), Mux(id_inst(7) === Bool(true), Bool(false), Bool(true)), Bool(false))
- val lutcfg = Mux(lut_load===Bool(true), Mux(id_inst(7) === Bool(true), Bool(true), Bool(false)), Bool(false))
- val lutexe = Mux(lut_exec ===Bool(true)  && luthw === Bool(true) , Bool(true), Bool(false))
- val lutstat = Bool(false)
+  val luthw = ex_ctrl.alu_lut_sel
+  val lut_exec = ex_ctrl.lut_ex1
+  val lut_exec2 = ex_ctrl.lut_ex2
+  val lut_load = ex_ctrl.lutl 
+  val lutdata_in = Mux(luthw, ex_rs(0), Bits(0,width=xLen))
+  val lutdata2_in = Bits(0,width=xLen)
+  val lutdata3_in =  Bits(0,width=xLen)
+  val lutrst = Mux(lut_load===Bool(true), Mux(id_inst(7) === Bool(true), Bool(false), Bool(true)), Bool(false))
+  val lutcfg = Mux(lut_load===Bool(true), Mux(id_inst(7) === Bool(true), Bool(true), Bool(false)), Bool(false))
+  val lutexe = Mux(lut_exec  && luthw, Bool(true), Bool(false))
+  val lutstat = Bool(false)
+
+
+
   lutcore.io.data_i := lutdata_in
   lutcore.io.data2_i := lutdata2_in
   lutcore.io.data3_i := lutdata3_in
@@ -314,9 +302,8 @@ val lutcore = Module(new LutHwCore)
   lutcore.io.id_cfg_i:= lutcfg
   lutcore.io.id_exe_i := lutexe
   lutcore.io.id_stat_i := lutstat
-
-
-
+  
+  
   // multiplier and divider
   val div = Module(new MulDiv(width = xLen,
                               unroll = if(usingFastMulDiv) 8 else 1,
@@ -400,11 +387,7 @@ val lutcore = Module(new LutHwCore)
     mem_reg_pc := ex_reg_pc
 
     //enable bit  for selecting LUT or ALU wb to memory
-    //val test = mem_ctrl.alu_lut_sel
-    //val mem_reg_sel = Reg(init=test)
-    mem_reg_wdata := Mux(lutex1 || lutex2, lutcore.io.data_o, alu.io.out )
-    //original line commented for now for LUT
-    //mem_reg_wdata := alu.io.out
+    mem_reg_wdata := alu.io.out
     when (ex_ctrl.rxs2 && (ex_ctrl.mem || ex_ctrl.rocc)) {
       mem_reg_rs2 := ex_rs(1)
     }
@@ -432,6 +415,7 @@ val lutcore = Module(new LutHwCore)
   when (mem_xcpt) { wb_reg_cause := mem_cause }
   when (mem_reg_valid || mem_reg_replay || mem_reg_xcpt_interrupt) {
     wb_ctrl := mem_ctrl
+
     wb_reg_wdata := Mux(mem_ctrl.fp && mem_ctrl.wxd, io.fpu.toint_data, mem_int_wdata)
     when (mem_ctrl.rocc) {
       wb_reg_rs2 := mem_reg_rs2
@@ -481,11 +465,12 @@ val lutcore = Module(new LutHwCore)
   val wb_valid = wb_reg_valid && !replay_wb && !csr.io.csr_xcpt
   val wb_wen = wb_valid && wb_ctrl.wxd
   val rf_wen = wb_wen || ll_wen
+  val lut_or_alu = Mux(wb_ctrl.lut_ex1 || wb_ctrl.lut_ex2, lutcore.io.data_o, wb_reg_wdata)
   val rf_waddr = Mux(ll_wen, ll_waddr, wb_waddr)
   val rf_wdata = Mux(dmem_resp_valid && dmem_resp_xpu, io.dmem.resp.bits.data,
                  Mux(ll_wen, ll_wdata,
                  Mux(wb_ctrl.csr =/= CSR.N, csr.io.rw.rdata,
-                 wb_reg_wdata)))
+                 lut_or_alu)))
   when (rf_wen) { rf.write(rf_waddr, rf_wdata) }
 
   // hook up control/status regfile
@@ -547,14 +532,13 @@ val lutcore = Module(new LutHwCore)
 
     id_csr_en && !io.fpu.fcsr_rdy || checkHazards(fp_hazard_targets, fp_sboard.read _)
   } else Bool(false)
-  val lut_sel =  Mux(alu_lut_sel, lut, Bool(false))
   val ctrl_stalld =
     id_ex_hazard || id_mem_hazard || id_wb_hazard || id_sboard_hazard ||
     id_ctrl.fp && id_stall_fpu ||
     id_ctrl.mem && !io.dmem.req.ready ||
     Bool(usingRoCC) && wb_reg_rocc_pending && id_ctrl.rocc && !io.rocc.cmd.ready ||
     id_do_fence ||
-    csr.io.csr_stall || lut_sel
+    csr.io.csr_stall 
   ctrl_killd := !io.imem.resp.valid || take_pc || ctrl_stalld || csr.io.interrupt
 
   io.imem.req.valid := take_pc
