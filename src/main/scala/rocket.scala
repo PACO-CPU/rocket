@@ -288,11 +288,12 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
   val lutdata_in = Mux(luthw, ex_rs(0), Bits(0,width=xLen))
   val lutdata2_in = Bits(0,width=xLen)
   val lutdata3_in =  Bits(0,width=xLen)
-  val lutrst = Mux(lut_load===Bool(true), Mux(id_inst(7) === Bool(true), Bool(false), Bool(true)), Bool(false))
-  val lutcfg = Mux(lut_load===Bool(true), Mux(id_inst(7) === Bool(true), Bool(true), Bool(false)), Bool(false))
+  val reset_or_conf = Mux(id_inst(7), Bool(false), Bool(true))
+  val lutrst = Mux(lut_load, reset_or_conf, Bool(false))
+  val lutcfg = Mux(lut_load,
+               Mux(id_inst(7), Bool(true), Bool(false)), Bool(false))
   val lutexe = Mux(lut_exec  && luthw, Bool(true), Bool(false))
   val lutstat = Bool(false)
-
 
 
   lutcore.io.data_i := lutdata_in
@@ -303,6 +304,11 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
   lutcore.io.id_exe_i := lutexe
   lutcore.io.id_stat_i := lutstat
   
+
+  printf("reset_or_conf = %d\n", reset_or_conf)
+  printf("data_i = %x | data2_i = %x | data3_i = %x \n", lutdata_in, lutdata2_in, lutdata3_in)
+  printf("lutrst = %d | lutcfg = %d | lutexe = %d | lutstat = %d \n", lutrst, lutcfg, lutexe, lutstat)
+
   
   // multiplier and divider
   val div = Module(new MulDiv(width = xLen,
