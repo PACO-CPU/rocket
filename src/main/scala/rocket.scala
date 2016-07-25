@@ -110,7 +110,7 @@ object ImmGen {
 
 //To test without black box extend Module and uncomment below lines
 class LutHwCore(implicit val p:Parameters) extends BlackBox with HasCoreParameters {
-    val io = new Bundle {
+  val io = new Bundle {
    val data_i     = Bits(INPUT, xLen)
    val data2_i    = Bits(INPUT, xLen)
    val data3_i    = Bits(INPUT, xLen)
@@ -118,6 +118,7 @@ class LutHwCore(implicit val p:Parameters) extends BlackBox with HasCoreParamete
    val id_stat_i  = Bool(INPUT)
    val id_exe_i   = Bool(INPUT)
    val id_cfg_i  = Bool(INPUT)
+
    val data_o  = Bits(OUTPUT, xLen)
    val data_valid_o = Bool(OUTPUT)
    val error_o = Bool(OUTPUT)
@@ -134,10 +135,6 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
     val fpu = new FPUIO().flip
     val rocc = new RoCCInterface().flip
   }
-
-
-
-
 
   var decode_table = XDecode.table
   if (usingFPU) decode_table ++= FDecode.table
@@ -239,12 +236,15 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
     else if (fastLoadWord) io.dmem.resp.bits.data_word_bypass
     else wb_reg_wdata
 
-   val alu_lut_sel = id_ctrl.alu_lut_sel
-   val lutload = id_ctrl.lutl
-   val lutex1 = id_ctrl.lut_ex1
-   val lutex2 = id_ctrl.lut_ex2
+ //instance for LUT core sending values to the corresponding io ports of Lut blackbox
+  val lutcore = Module(new LutHwCore)
 
- 
+  val luthw = id_ctrl.alu_lut_sel
+  val lut_load = id_ctrl.lutl 
+  val lut_exec = id_ctrl.lut_ex1
+  val lut_exec3 = id_ctrl.lut_ex2
+
+
   // detect bypass opportunities
   val ex_waddr = ex_reg_inst(11,7)
   val mem_waddr = mem_reg_inst(11,7)
@@ -257,6 +257,7 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
   val id_bypass_src = id_raddr.map(raddr => bypass_sources.map(s => s._1 && s._2 === raddr))
 
   // execute stage
+
   val bypass_mux = Vec(bypass_sources.map(_._3))
   val ex_reg_rs_bypass = Reg(Vec(id_raddr.size, Bool()))
   val ex_reg_rs_lsb = Reg(Vec(id_raddr.size, UInt()))
@@ -272,44 +273,38 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
     A2_IMM -> ex_imm,
     A2_FOUR -> SInt(4)))
 
-  val alu = Module(new ALU)
-  alu.io.dw := ex_ctrl.alu_dw
-  alu.io.fn := ex_ctrl.alu_fn
-  alu.io.in2 := ex_op2.toUInt
-  alu.io.in1 := ex_op1.toUInt
-
- //instance for LUT core sending values to the corresponding io ports of Lut blackbox
-  val lutcore = Module(new LutHwCore)
-
-  val luthw = ex_ctrl.alu_lut_sel
-  val lut_exec = ex_ctrl.lut_ex1
-  val lut_exec2 = ex_ctrl.lut_ex2
-  val lut_load = ex_ctrl.lutl 
+  // LUTCore Blackbox
   val lutdata_in = Mux(luthw, ex_rs(0), Bits(0,width=xLen))
   val lutdata2_in = Bits(0,width=xLen)
   val lutdata3_in =  Bits(0,width=xLen)
   val reset_or_conf = Mux(id_inst(7), Bool(false), Bool(true))
-  val lutrst = Mux(lut_load, reset_or_conf, Bool(false))
-  val lutcfg = Mux(lut_load,
-               Mux(id_inst(7), Bool(true), Bool(false)), Bool(false))
+  val lutrst = Mux(lut_load, !(ex_reg_inst(7).toBool), Bool(false))
+  val lutcfg = Mux(lut_load, ex_reg_inst(7).toBool, Bool(false))
   val lutexe = Mux(lut_exec  && luthw, Bool(true), Bool(false))
   val lutstat = Bool(false)
 
+  printf("reset_or_conf = %d\n", reset_or_conf)
+  printf("data_i = %x | data2_i = %x | data3_i = %x \n", lutdata_in, lutdata2_in, lutdata3_in)
+  printf("lutrst = %d | lutcfg = %d | lutexe = %d | lutstat = %d | luthw = %d \n", lutrst, lutcfg, lutexe, lutstat, luthw)
 
+  // Data Inputs
   lutcore.io.data_i := lutdata_in
   lutcore.io.data2_i := lutdata2_in
   lutcore.io.data3_i := lutdata3_in
+
+  // Flag Inputs
   lutcore.io.id_rst_i := lutrst
   lutcore.io.id_cfg_i:= lutcfg
   lutcore.io.id_exe_i := lutexe
   lutcore.io.id_stat_i := lutstat
   
 
-  printf("reset_or_conf = %d\n", reset_or_conf)
-  printf("data_i = %x | data2_i = %x | data3_i = %x \n", lutdata_in, lutdata2_in, lutdata3_in)
-  printf("lutrst = %d | lutcfg = %d | lutexe = %d | lutstat = %d \n", lutrst, lutcfg, lutexe, lutstat)
+  val alu = Module(new ALU)
+  alu.io.dw := ex_ctrl.alu_dw
+  alu.io.fn := ex_ctrl.alu_fn
+  alu.io.in2 := ex_op2.toUInt
+  alu.io.in1 := ex_op1.toUInt
 
-  
   // multiplier and divider
   val div = Module(new MulDiv(width = xLen,
                               unroll = if(usingFastMulDiv) 8 else 1,
