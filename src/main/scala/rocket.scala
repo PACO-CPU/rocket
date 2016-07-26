@@ -109,7 +109,7 @@ object ImmGen {
 }
 
 //To test without black box extend Module and uncomment below lines
-class LutHwCore(implicit val p:Parameters) extends BlackBox with HasCoreParameters {
+class lut_core(implicit val p:Parameters) extends BlackBox with HasCoreParameters {
   val io = new Bundle {
    val data_i     = Bits(INPUT, xLen)
    val data2_i    = Bits(INPUT, xLen)
@@ -123,7 +123,25 @@ class LutHwCore(implicit val p:Parameters) extends BlackBox with HasCoreParamete
    val data_valid_o = Bool(OUTPUT)
    val error_o = Bool(OUTPUT)
    val status_o = Bits(OUTPUT, xLen)
+
+   // Rename variable such that they don't have io_*
+   data_i.setName("data_i")
+   data2_i.setName("data2_i")
+   data3_i.setName("data3_i")
+   
+   id_rst_i.setName("id_rst_i")
+   id_stat_i.setName("id_stat_i")
+   id_exe_i.setName("id_exe_i")
+   id_cfg_i.setName("id_cfg_i")
+
+   data_o.setName("data_o")
+   data_valid_o.setName("data_valid_o")
+   error_o.setName("error_o")
+   status_o.setName("status_o")
   }  
+
+  renameClock(Driver.implicitClock, "clk")
+
 }
 
 class Rocket(implicit p: Parameters) extends CoreModule()(p) {
@@ -237,7 +255,7 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
     else wb_reg_wdata
 
  //instance for LUT core sending values to the corresponding io ports of Lut blackbox
-  val lutcore = Module(new LutHwCore)
+  val lutcore = Module(new lut_core)
 
   val luthw = id_ctrl.alu_lut_sel
   val lut_load = id_ctrl.lutl 
