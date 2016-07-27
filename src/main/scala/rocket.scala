@@ -261,6 +261,7 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
   val lut_load = id_ctrl.lutl 
   val lut_exec = id_ctrl.lut_ex1
   val lut_exec3 = id_ctrl.lut_ex2
+  val lut_stat = id_ctrl.luts
 
 
   // detect bypass opportunities
@@ -299,7 +300,8 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
   val lutrst = Mux(lut_load, !(ex_reg_inst(7).toBool), Bool(false))
   val lutcfg = Mux(lut_load, ex_reg_inst(7).toBool, Bool(false))
   val lutexe = Mux(lut_exec  && luthw, Bool(true), Bool(false))
-  val lutstat = Bool(false)
+  //val lutstat = Bool(false)
+  val lutstat = Mux(luthw && lut_stat, Bool(true), Bool(false))
 
   printf("reset_or_conf = %d\n", reset_or_conf)
   printf("data_i = %x | data2_i = %x | data3_i = %x \n", lutdata_in, lutdata2_in, lutdata3_in)
@@ -484,7 +486,7 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
   val wb_valid = wb_reg_valid && !replay_wb && !csr.io.csr_xcpt
   val wb_wen = wb_valid && wb_ctrl.wxd
   val rf_wen = wb_wen || ll_wen
-  val lut_or_alu = Mux(wb_ctrl.lut_ex1 || wb_ctrl.lut_ex2, lutcore.io.data_o, wb_reg_wdata)
+  val lut_or_alu = Mux(wb_ctrl.lut_ex1 || wb_ctrl.lut_ex2 || wb_ctrl.luts, lutcore.io.data_o, wb_reg_wdata)
   val rf_waddr = Mux(ll_wen, ll_waddr, wb_waddr)
   val rf_wdata = Mux(dmem_resp_valid && dmem_resp_xpu, io.dmem.resp.bits.data,
                  Mux(ll_wen, ll_wdata,
