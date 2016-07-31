@@ -101,9 +101,9 @@ object XDecode extends DecodeConstants
     SH->        List(Y,    N,N,N,N,N,Y,Y,A2_IMM, A1_RS1, IMM_S, DW_XPR,FN_ADD,   Y,M_XWR,    MT_H, N,N,N,N,N,N,CSR.N,N,N,N,  N, N,     N, N,   N),
     SW->        List(Y,    N,N,N,N,N,Y,Y,A2_IMM, A1_RS1, IMM_S, DW_XPR,FN_ADD,   Y,M_XWR,    MT_W, N,N,N,N,N,N,CSR.N,N,N,N,  N, N,     N, N,   N),
     SD->        List(xpr64,N,N,N,N,N,Y,Y,A2_IMM, A1_RS1, IMM_S, DW_XPR,FN_ADD,   Y,M_XWR,    MT_D, N,N,N,N,N,N,CSR.N,N,N,N,  N, N,     N, N,   N),
-    LUTL->      List(Y,    N,N,N,N,N,Y,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,FN_X,     N,M_X,      MT_X, N,N,N,N,N,N,CSR.N,N,N,N,  Y, N,     N, Y,   N),
-    LUTE->      List(Y,    N,N,N,N,N,Y,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,FN_X,     N,M_X,      MT_X, N,N,N,N,N,Y,CSR.N,N,N,N,  Y, Y,     N, N,   N),
-    LUTS->      List(Y,    N,N,N,N,N,Y,N,A2_X,   A1_X,   IMM_X, DW_XPR,FN_X,     N,M_X,      MT_X, N,N,N,N,N,Y,CSR.N,N,N,N,  Y, N,     N, N,   Y),
+    LUTL->      List(Y,    N,N,N,N,N,N,Y,A2_ZERO,A1_RS1, IMM_X, DW_X,  FN_X,     N,M_X,      MT_X, N,N,N,N,N,N,CSR.N,N,N,N,  Y, N,     N, Y,   N),
+    LUTE->      List(Y,    N,N,N,N,N,N,Y,A2_ZERO,A1_RS1, IMM_X, DW_X,  FN_X,     N,M_X,      MT_X, N,N,N,N,N,Y,CSR.N,N,N,N,  Y, Y,     N, N,   N),
+    LUTS->      List(Y,    N,N,N,N,N,N,N,A2_ZERO,A1_ZERO,IMM_X, DW_X,  FN_X,     N,M_X,      MT_X, N,N,N,N,N,Y,CSR.N,N,N,N,  Y, N,     N, N,   Y),
     //LUTE3->     List(Y,    N,N,N,N,N,Y,Y,A2_RS2, A1_RS1, IMM_I, DW_XPR,FN_ADD,   Y,M_XRD,    MT_X, N,N,N,N,N,N,CSR.N,N,N,N,  Y),
 
     AMOADD_W->  List(Y,    N,N,N,N,N,Y,Y,A2_ZERO,A1_RS1, IMM_X, DW_XPR,FN_ADD,   Y,M_XA_ADD, MT_W, N,N,N,N,N,Y,CSR.N,N,N,Y,  N, N,     N, N,   N),
