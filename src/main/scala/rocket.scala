@@ -109,12 +109,17 @@ object ImmGen {
 }
 
 //To test without black box extend Module and uncomment below lines
-class lut_core(implicit val p:Parameters) extends BlackBox {
+class lut_wrapper(implicit val p:Parameters) extends BlackBox {
   val io = new Bundle {
    val clk      = Bool(INPUT)
+   
+   val lutsel_i = Bits(INPUT,5)
+   val charm_i = Bool(INPUT)
+   val strange_i = Bits(INPUT,2)
+   val data_we_i = Bool(INPUT)
+
    val data_i     = Bits(INPUT, p(XLen))
    val data2_i    = Bits(INPUT, p(XLen))
-   val data3_i    = Bits(INPUT, p(XLen))
    val id_rst_i  = Bool(INPUT)
    val id_stat_i  = Bool(INPUT)
    val id_exe_i   = Bool(INPUT)
@@ -129,9 +134,13 @@ class lut_core(implicit val p:Parameters) extends BlackBox {
    // SED for the win.
    clk.setName("clk_dirty_hax_0001")
    // Rename variable such that they don't have io_*
+   lutsel_i.setName("lutsel_i")
+   charm_i.setName("charm_i")
+   strange_i.setName("strange_i")
+   data_we_i.setName("data_we_i")
+
    data_i.setName("data_i")
    data2_i.setName("data2_i")
-   data3_i.setName("data3_i")
    
    id_rst_i.setName("id_rst_i")
    id_stat_i.setName("id_stat_i")
@@ -355,22 +364,32 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
     (ex_ctrl.fp && io.fpu.illegal_rm,      UInt(Causes.illegal_instruction))))
   
   //instance for LUT core sending values to the corresponding io ports of Lut blackbox
-  val lutcore = Module(new lut_core())
+  val lutcore = Module(new lut_wrapper())
   // we need to wait for the data register to actually be ready:
   val lut_data_ready = ex_reg_valid && !ctrl_killx
   val lutdata_in = ex_rs(0)
-  val lutdata2_in = Bits(0,width=xLen)
+  val lutdata2_in = ex_rs(1)
   val lutdata3_in =  Bits(0,width=xLen)
-  val lutrst = ex_ctrl.lutl && ex_ctrl.alu_lut_sel && !(ex_reg_inst(7).toBool)
+  val lutrst = ex_ctrl.lutl && !(ex_reg_inst(7).toBool)
   val lutcfg = lut_data_ready && ex_ctrl.lutl && (ex_reg_inst(7).toBool)
-  val lutexe = lut_data_ready && (ex_ctrl.lut_ex1 || ex_ctrl.lut_ex2) && ex_ctrl.alu_lut_sel
+  val lutexe = lut_data_ready && ex_ctrl.lut_ex
+  val lutwrt = lut_data_ready && ex_ctrl.lut_wr
   val lutstat = ex_ctrl.luts 
+  val lutsel = Cat(ex_reg_inst(26,25),ex_reg_inst(14,12))
+  val lutcharm = ex_reg_inst(29)
+  val lutstrange = ex_reg_inst(28,27)
 
   printf("lut:      R:%d C:%d E:%d S:%d  D:%x,%x,%x\n",lutrst,lutcfg,lutexe,lutstat,lutdata_in,lutdata2_in,lutdata3_in)
+  
+  // Data/core multiplexing Inputs
+  lutcore.io.lutsel_i := lutsel
+  lutcore.io.charm_i := lutcharm
+  lutcore.io.strange_i := lutstrange
+  lutcore.io.data_we_i := lutwrt
+
   // Data Inputs
   lutcore.io.data_i := lutdata_in
   lutcore.io.data2_i := lutdata2_in
-  lutcore.io.data3_i := lutdata3_in
 
   // Flag Inputs
   lutcore.io.id_rst_i := lutrst
@@ -390,8 +409,6 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
   val mem_misprediction = mem_wrong_npc && mem_reg_valid && (mem_ctrl.branch || mem_ctrl.jalr || mem_ctrl.jal)
   val want_take_pc_mem = mem_reg_valid && (mem_misprediction || mem_reg_flush_pipe)
   take_pc_mem := want_take_pc_mem && !mem_npc_misaligned
-
-  val mem_lut_output_valid = !(mem_ctrl.lut_ex1 || mem_ctrl.lut_ex2) || lutcore.io.data_valid_o
 
   mem_reg_valid := !ctrl_killx
   mem_reg_replay := !take_pc_mem_wb && replay_ex
@@ -426,7 +443,7 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
   val dcache_kill_mem = mem_reg_valid && mem_ctrl.wxd && io.dmem.replay_next.valid // structural hazard on writeback port
   val fpu_kill_mem = mem_reg_valid && mem_ctrl.fp && io.fpu.nack_mem
   val replay_mem  = dcache_kill_mem || mem_reg_replay || fpu_kill_mem
-  val killm_common = dcache_kill_mem || take_pc_wb || mem_reg_xcpt || !mem_reg_valid // || !mem_lut_output_valid
+  val killm_common = dcache_kill_mem || take_pc_wb || mem_reg_xcpt || !mem_reg_valid
   div.io.kill := killm_common && Reg(next = div.io.req.fire())
   val ctrl_killm = killm_common || mem_xcpt || fpu_kill_mem
 
@@ -443,7 +460,7 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
         mem_ctrl.luts,
         lutcore.io.status_o,
         Mux(
-          mem_ctrl.lut_ex1 || mem_ctrl.lut_ex2,
+          mem_ctrl.lut_ex,
           lutcore.io.data_o,
           Mux(mem_ctrl.fp && mem_ctrl.wxd, io.fpu.toint_data, mem_int_wdata)))
     when (mem_ctrl.rocc) {
@@ -496,7 +513,7 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
   val lut_or_alu = 
     Mux(wb_ctrl.luts,
       lutcore.io.status_o,
-      Mux(wb_ctrl.lut_ex1 || wb_ctrl.lut_ex2, 
+      Mux(wb_ctrl.lut_ex, 
         lutcore.io.data_o, 
         wb_reg_wdata))
   val rf_wen = wb_wen || ll_wen || reg_ll_wen_postponed
@@ -558,7 +575,7 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
   sboard.set(wb_set_sboard && wb_wen, wb_waddr)
 
   // stall for RAW/WAW hazards on CSRs, loads, AMOs, and mul/div in execute stage.
-  val ex_cannot_bypass = ex_ctrl.csr =/= CSR.N || ex_ctrl.jalr || ex_ctrl.mem || ex_ctrl.div || ex_ctrl.fp || ex_ctrl.rocc || ex_ctrl.lut_ex1 || ex_ctrl.lut_ex2
+  val ex_cannot_bypass = ex_ctrl.csr =/= CSR.N || ex_ctrl.jalr || ex_ctrl.mem || ex_ctrl.div || ex_ctrl.fp || ex_ctrl.rocc || ex_ctrl.lut_ex
   val data_hazard_ex = ex_ctrl.wxd && checkHazards(hazard_targets, _ === ex_waddr)
   val fp_data_hazard_ex = ex_ctrl.wfd && checkHazards(fp_hazard_targets, _ === ex_waddr)
   val id_ex_hazard = ex_reg_valid && (data_hazard_ex && ex_cannot_bypass || fp_data_hazard_ex)
