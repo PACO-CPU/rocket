@@ -111,7 +111,6 @@ object ImmGen {
 //To test without black box extend Module and uncomment below lines
 class lut_wrapper(implicit val p:Parameters) extends BlackBox {
   val io = new Bundle {
-   val clk      = Bool(INPUT)
    
    val lutsel_i = Bits(INPUT,5)
    val charm_i = Bool(INPUT)
@@ -129,10 +128,7 @@ class lut_wrapper(implicit val p:Parameters) extends BlackBox {
    val data_valid_o = Bool(OUTPUT)
    val error_o = Bool(OUTPUT)
    val status_o = Bits(OUTPUT, p(XLen))
-    
-   // could not figure out how to make chisel connect the clock signal.
-   // SED for the win.
-   clk.setName("clk_dirty_hax_0001")
+   
    // Rename variable such that they don't have io_*
    lutsel_i.setName("lutsel_i")
    charm_i.setName("charm_i")
@@ -153,6 +149,9 @@ class lut_wrapper(implicit val p:Parameters) extends BlackBox {
    status_o.setName("status_o")
   }  
 
+  /* Add the implicit clock from chisel to this module,
+     and rename it such that it is recognized by vhdl */
+  addClock(Driver.implicitClock)
   renameClock(Driver.implicitClock,"clk")
 
 }
