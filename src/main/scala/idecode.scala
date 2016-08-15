@@ -17,8 +17,8 @@ abstract trait DecodeConstants
                 //         fp_val| | renx2                                                         | | renf3         |
                 //         | rocc| | | renx1     s_alu1                          mem_val           | | | wfd         |
                 //   val   | | br| | | | s_alu2  |       imm    dw     alu       | mem_cmd mem_type| | | | div       |     alu_lut_sel
-                //   |     | | | | | | | |       |       |      |      |         | |         |     | | | | | wxd     | fence |         lut_ex2
-                //   |     | | | | | | | |       |       |      |      |         | |         |     | | | | | | csr   | | amo | lut_ex1  |  lutl luts
+                //   |     | | | | | | | |       |       |      |      |         | |         |     | | | | | wxd     | fence |         lut_wr
+                //   |     | | | | | | | |       |       |      |      |         | |         |     | | | | | | csr   | | amo | lut_ex   |  lutl luts
                 //   |     | | | | | | | |       |       |      |      |         | |         |     | | | | | | |     | | |   |  |       |  |     |
                 List(N,    X,X,X,X,X,X,X,A2_X,   A1_X,   IMM_X, DW_X,  FN_X,     N,M_X,      MT_X, X,X,X,X,X,X,CSR.X,X,X,X,  X, X,      X, X,    X  )
 
@@ -53,8 +53,8 @@ class IntCtrlSigs extends Bundle {
   val fence = Bool()
   val amo = Bool()
   val alu_lut_sel = Bool()
-  val lut_ex1 = Bool()
-  val lut_ex2 = Bool()
+  val lut_ex = Bool()
+  val lut_wr = Bool()
   val lutl = Bool()
   val luts = Bool()
 
@@ -62,7 +62,7 @@ class IntCtrlSigs extends Bundle {
     val decoder = DecodeLogic(inst, XDecode.decode_default, table)
     val sigs = Seq(legal, fp, rocc, branch, jal, jalr, rxs2, rxs1, sel_alu2,
                    sel_alu1, sel_imm, alu_dw, alu_fn, mem, mem_cmd, mem_type,
-                   rfs1, rfs2, rfs3, wfd, div, wxd, csr, fence_i, fence, amo, alu_lut_sel,lut_ex1,lut_ex2,lutl,luts)
+                   rfs1, rfs2, rfs3, wfd, div, wxd, csr, fence_i, fence, amo, alu_lut_sel,lut_ex,lut_wr,lutl,luts)
     sigs zip decoder map {case(s,d) => s := d}
     this
   }
@@ -76,8 +76,8 @@ object XDecode extends DecodeConstants
                 //         fp_val| | renx2                                                         | | renf3         |
                 //         | rocc| | | renx1     s_alu1                          mem_val           | | | wfd         |
                 //   val   | | br| | | | s_alu2  |       imm    dw     alu       | mem_cmd mem_type| | | | div       |       alu_lut_sel
-                //   |     | | | | | | | |       |       |      |      |         | |         |     | | | | | wxd     | fence |         lut_ex2 luts 
-                //   |     | | | | | | | |       |       |      |      |         | |         |     | | | | | | csr   | | amo | lut_ex1 |  lutl | 
+                //   |     | | | | | | | |       |       |      |      |         | |         |     | | | | | wxd     | fence |         lut_wr  luts 
+                //   |     | | | | | | | |       |       |      |      |         | |         |     | | | | | | csr   | | amo | lut_ex  |  lutl | 
                 //   |     | | | | | | | |       |       |      |      |         | |         |     | | | | | | |     | | |   |  |      |  |    |
     BNE->       List(Y,    N,N,Y,N,N,Y,Y,A2_RS2, A1_RS1, IMM_SB,DW_X,  FN_SNE,   N,M_X,      MT_X, N,N,N,N,N,N,CSR.N,N,N,N,  N, N,     N, N,   N),
     BEQ->       List(Y,    N,N,Y,N,N,Y,Y,A2_RS2, A1_RS1, IMM_SB,DW_X,  FN_SEQ,   N,M_X,      MT_X, N,N,N,N,N,N,CSR.N,N,N,N,  N, N,     N, N,   N),
@@ -101,9 +101,12 @@ object XDecode extends DecodeConstants
     SH->        List(Y,    N,N,N,N,N,Y,Y,A2_IMM, A1_RS1, IMM_S, DW_XPR,FN_ADD,   Y,M_XWR,    MT_H, N,N,N,N,N,N,CSR.N,N,N,N,  N, N,     N, N,   N),
     SW->        List(Y,    N,N,N,N,N,Y,Y,A2_IMM, A1_RS1, IMM_S, DW_XPR,FN_ADD,   Y,M_XWR,    MT_W, N,N,N,N,N,N,CSR.N,N,N,N,  N, N,     N, N,   N),
     SD->        List(xpr64,N,N,N,N,N,Y,Y,A2_IMM, A1_RS1, IMM_S, DW_XPR,FN_ADD,   Y,M_XWR,    MT_D, N,N,N,N,N,N,CSR.N,N,N,N,  N, N,     N, N,   N),
-    LUTL->      List(Y,    N,N,N,N,N,Y,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,FN_X,     N,M_X,      MT_X, N,N,N,N,N,N,CSR.N,N,N,N,  Y, N,     N, Y,   N),
-    LUTE->      List(Y,    N,N,N,N,N,Y,N,A2_ZERO,A1_RS1, IMM_X, DW_XPR,FN_X,     N,M_X,      MT_X, N,N,N,N,N,Y,CSR.N,N,N,N,  Y, Y,     N, N,   N),
-    LUTS->      List(Y,    N,N,N,N,N,Y,N,A2_X,   A1_X,   IMM_X, DW_XPR,FN_X,     N,M_X,      MT_X, N,N,N,N,N,Y,CSR.N,N,N,N,  Y, N,     N, N,   Y),
+    LUTL->      List(Y,    N,N,N,N,N,N,Y,A2_ZERO,A1_RS1, IMM_X, DW_X,  FN_X,     N,M_X,      MT_X, N,N,N,N,N,N,CSR.N,N,N,N,  Y, N,     N, Y,   N),
+    LUTE->      List(Y,    N,N,N,N,N,N,Y,A2_ZERO,A1_RS1, IMM_X, DW_X,  FN_X,     N,M_X,      MT_X, N,N,N,N,N,Y,CSR.N,N,N,N,  Y, Y,     Y, N,   N),
+    LUTE2->     List(Y,    N,N,N,N,N,Y,Y,A2_ZERO,A1_RS1, IMM_X, DW_X,  FN_X,     N,M_X,      MT_X, N,N,N,N,N,Y,CSR.N,N,N,N,  Y, Y,     Y, N,   N),
+    LUTW->      List(Y,    N,N,N,N,N,N,Y,A2_ZERO,A1_RS1, IMM_X, DW_X,  FN_X,     N,M_X,      MT_X, N,N,N,N,N,N,CSR.N,N,N,N,  Y, N,     Y, N,   N),
+    LUTW2->     List(Y,    N,N,N,N,N,Y,Y,A2_ZERO,A1_RS1, IMM_X, DW_X,  FN_X,     N,M_X,      MT_X, N,N,N,N,N,N,CSR.N,N,N,N,  Y, N,     Y, N,   N),
+    LUTS->      List(Y,    N,N,N,N,N,N,N,A2_ZERO,A1_ZERO,IMM_X, DW_X,  FN_X,     N,M_X,      MT_X, N,N,N,N,N,Y,CSR.N,N,N,N,  Y, N,     N, N,   Y),
     //LUTE3->     List(Y,    N,N,N,N,N,Y,Y,A2_RS2, A1_RS1, IMM_I, DW_XPR,FN_ADD,   Y,M_XRD,    MT_X, N,N,N,N,N,N,CSR.N,N,N,N,  Y),
 
     AMOADD_W->  List(Y,    N,N,N,N,N,Y,Y,A2_ZERO,A1_RS1, IMM_X, DW_XPR,FN_ADD,   Y,M_XA_ADD, MT_W, N,N,N,N,N,Y,CSR.N,N,N,Y,  N, N,     N, N,   N),
