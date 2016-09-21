@@ -18,9 +18,9 @@ abstract trait DecodeConstants
                 //         | rocc| | | renx1     s_alu1                          mem_val           | | | wfd         |
                 //   val   | | br| | | | s_alu2  |       imm    dw     alu       | mem_cmd mem_type| | | | div       |     alu_lut_sel
                 //   |     | | | | | | | |       |       |      |      |         | |         |     | | | | | wxd     | fence |         lut_wr
-                //   |     | | | | | | | |       |       |      |      |         | |         |     | | | | | | csr   | | amo | lut_ex   |  lutl luts
-                //   |     | | | | | | | |       |       |      |      |         | |         |     | | | | | | |     | | |   |  |       |  |     |
-                List(N,    X,X,X,X,X,X,X,A2_X,   A1_X,   IMM_X, DW_X,  FN_X,     N,M_X,      MT_X, X,X,X,X,X,X,CSR.X,X,X,X,  X, X,      X, X,    X  )
+                //   |     | | | | | | | |       |       |      |      |         | |         |     | | | | | | csr   | | amo | lut_ex   |  lutl luts Precise
+                //   |     | | | | | | | |       |       |      |      |         | |         |     | | | | | | |     | | |   |  |       |  |     |  | 
+                List(N,    X,X,X,X,X,X,X,A2_X,   A1_X,   IMM_X, DW_X,  FN_X,     N,M_X,      MT_X, X,X,X,X,X,X,CSR.X,X,X,X,  X, X,      X, X,    X, X)
 
   val table: Array[(BitPat, List[BitPat])]
 }
@@ -57,12 +57,13 @@ class IntCtrlSigs extends Bundle {
   val lut_wr = Bool()
   val lutl = Bool()
   val luts = Bool()
+  val precise = Bool()
 
   def decode(inst: UInt, table: Iterable[(BitPat, List[BitPat])]) = {
     val decoder = DecodeLogic(inst, XDecode.decode_default, table)
     val sigs = Seq(legal, fp, rocc, branch, jal, jalr, rxs2, rxs1, sel_alu2,
                    sel_alu1, sel_imm, alu_dw, alu_fn, mem, mem_cmd, mem_type,
-                   rfs1, rfs2, rfs3, wfd, div, wxd, csr, fence_i, fence, amo, alu_lut_sel,lut_ex,lut_wr,lutl,luts)
+                   rfs1, rfs2, rfs3, wfd, div, wxd, csr, fence_i, fence, amo, alu_lut_sel,lut_ex,lut_wr,lutl,luts, precise)
     sigs zip decoder map {case(s,d) => s := d}
     this
   }
