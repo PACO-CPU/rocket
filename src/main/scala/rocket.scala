@@ -305,8 +305,52 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
   val alu = Module(new ALU)
   alu.io.dw := ex_ctrl.alu_dw
   alu.io.fn := ex_ctrl.alu_fn
-  alu.io.in2 := ex_op2.toUInt
-  alu.io.in1 := ex_op1.toUInt
+
+
+///////////////////////////////////////////////////////////////////////////////
+// approximating operands before feeding them into the ALU
+// LSBs are truncated and replaced by zeros if ex_ctrl.precise equals to zero
+// in original design next lines formerly were:
+//                                    alu.io.in2 := ex_op2.toUInt
+//                                    alu.io.in1 := ex_op1.toUInt
+
+val ex_app_bits = ex_reg_inst(31,26)
+
+when (!ex_ctrl.precise && (ex_app_bits.toUInt === 63 )){
+ alu.io.in1 := Cat(ex_op1(xLen-1,2),Bits(0,2))
+ alu.io.in2 := Cat(ex_op2(xLen-1,2),Bits(0,2))
+}
+.elsewhen(!ex_ctrl.precise && (ex_app_bits.toUInt === 62 )){
+ alu.io.in1 := Cat(ex_op1(xLen-1,4),Bits(0,4))
+ alu.io.in2 := Cat(ex_op2(xLen-1,4),Bits(0,4))
+}
+.elsewhen(!ex_ctrl.precise && (ex_app_bits.toUInt === 60 )){
+ alu.io.in1 := Cat(ex_op1(xLen-1,7),Bits(0,7))
+ alu.io.in2 := Cat(ex_op2(xLen-1,7),Bits(0,7))
+}
+.elsewhen(!ex_ctrl.precise && (ex_app_bits.toUInt === 56 )){
+ alu.io.in1 := Cat(ex_op1(xLen-1,10),Bits(0,10))
+ alu.io.in2 := Cat(ex_op2(xLen-1,10),Bits(0,10))
+}
+.elsewhen(!ex_ctrl.precise && (ex_app_bits.toUInt === 48 )){
+ alu.io.in1 := Cat(ex_op1(xLen-1,15),Bits(0,15))
+ alu.io.in2 := Cat(ex_op2(xLen-1,15),Bits(0,15))
+}
+.elsewhen(!ex_ctrl.precise && (ex_app_bits.toUInt === 32 )){
+ alu.io.in1 := Cat(ex_op1(xLen-1,20),Bits(0,20))
+ alu.io.in2 := Cat(ex_op2(xLen-1,20),Bits(0,20))
+}
+.elsewhen(!ex_ctrl.precise && (ex_app_bits.toUInt === 0 )){
+ alu.io.in1 := Cat(ex_op1(xLen-1,26),Bits(0,26))
+ alu.io.in2 := Cat(ex_op2(xLen-1,26),Bits(0,26))
+}
+.otherwise {
+ alu.io.in1 := ex_op1.toUInt
+ alu.io.in2 := ex_op2.toUInt
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 
   // multiplier and divider
   val div = Module(new MulDiv(width = xLen,
@@ -318,6 +362,50 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
   div.io.req.bits.in1 := ex_rs(0)
   div.io.req.bits.in2 := ex_rs(1)
   div.io.req.bits.tag := ex_waddr
+
+
+///////////////////////////////////////////////////////////////////////////////
+// approximating operands before feeding them into the Multiplier/divider unit
+// LSBs are truncated and replaced by zeros if ex_ctrl.precise equals to zero
+// in original design next lines formerly were:
+//                        div.io.req.bits.in1 := ex_rs(0)
+//                        div.io.req.bits.in2 := ex_rs(1)
+
+
+when (!ex_ctrl.precise && (ex_app_bits.toUInt === 63 )){
+ div.io.req.bits.in1 := Cat(ex_rs(0)(xLen-1,2),UInt(0,2))
+ div.io.req.bits.in2 := Cat(ex_rs(1)(xLen-1,2),UInt(0,2))
+}
+.elsewhen(!ex_ctrl.precise && (ex_app_bits.toUInt === 62 )){
+ div.io.req.bits.in1 := Cat(ex_rs(0)(xLen-1,4),UInt(0,4))
+ div.io.req.bits.in2 := Cat(ex_rs(1)(xLen-1,4),UInt(0,4))
+}
+.elsewhen(!ex_ctrl.precise && (ex_app_bits.toUInt === 60 )){
+ div.io.req.bits.in1 := Cat(ex_rs(0)(xLen-1,7),UInt(0,7))
+ div.io.req.bits.in2 := Cat(ex_rs(1)(xLen-1,7),UInt(0,7))
+}
+.elsewhen(!ex_ctrl.precise && (ex_app_bits.toUInt === 56 )){
+ div.io.req.bits.in1 := Cat(ex_rs(0)(xLen-1,10),UInt(0,10))
+ div.io.req.bits.in2 := Cat(ex_rs(1)(xLen-1,10),UInt(0,10))
+}
+.elsewhen(!ex_ctrl.precise && (ex_app_bits.toUInt === 48 )){
+ div.io.req.bits.in1 := Cat(ex_rs(0)(xLen-1,15),UInt(0,15))
+ div.io.req.bits.in2 := Cat(ex_rs(1)(xLen-1,15),UInt(0,15))
+}
+.elsewhen(!ex_ctrl.precise && (ex_app_bits.toUInt === 32 )){
+ div.io.req.bits.in1 := Cat(ex_rs(0)(xLen-1,20),UInt(0,20))
+ div.io.req.bits.in2 := Cat(ex_rs(1)(xLen-1,20),UInt(0,20))
+}
+.elsewhen(!ex_ctrl.precise && (ex_app_bits.toUInt === 0 )){
+ div.io.req.bits.in1 := Cat(ex_rs(0)(xLen-1,26),UInt(0,26))
+ div.io.req.bits.in2 := Cat(ex_rs(1)(xLen-1,26),UInt(0,26))
+}
+.otherwise {
+ div.io.req.bits.in1 := ex_rs(0)
+ div.io.req.bits.in2 := ex_rs(1)
+}
+///////////////////////////////////////////////////////////////////////////////
+
 
   ex_reg_valid := !ctrl_killd
   ex_reg_xcpt := !ctrl_killd && id_xcpt
