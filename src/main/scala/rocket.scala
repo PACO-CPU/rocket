@@ -270,6 +270,10 @@ class Rocket(implicit p: Parameters) extends CoreModule()(p) {
     else wb_reg_wdata
 
 
+  // approximation determination
+  val id_precise = id_ctrl.precise
+  val id_app_bits = id_inst(31,26)
+
   // detect bypass opportunities
   val ex_waddr = ex_reg_inst(11,7)
   val mem_waddr = mem_reg_inst(11,7)
